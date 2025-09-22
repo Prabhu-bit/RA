@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import io
 import sys
+import json # Added
 
 # Add src directory to Python path for importing preprocess module
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,13 +16,18 @@ from src.preprocess import NUMERIC_FEATURES, CATEGORICAL_FEATURES, ALL_FEATURES,
 # File paths
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
 PREPROCESSING_PIPELINE_PATH = os.path.join(MODELS_DIR, 'preprocessing_pipeline.joblib')
-XGBOOST_MODEL_PATH = os.path.join(MODELS_DIR, 'xgboost_model.joblib')
+# XGBOOST_MODEL_PATH = os.path.join(MODELS_DIR, 'xgboost_model.joblib') # Commented out
+MLP_MODEL_PATH = os.path.join(MODELS_DIR, 'mlp_model.joblib') # Added
+
+# Debug output path
+DEBUG_OUTPUT_PATH = os.path.join(MODELS_DIR, 'debug_output.json') # Added
 
 # Load the preprocessing pipeline and the trained model
 @st.cache_resource
 def load_resources():
     preprocessor = joblib.load(PREPROCESSING_PIPELINE_PATH)
-    model = joblib.load(XGBOOST_MODEL_PATH)
+    # model = joblib.load(XGBOOST_MODEL_PATH) # Commented out
+    model = joblib.load(MLP_MODEL_PATH) # Changed to load MLP model
     return preprocessor, model
 
 preprocessor, model = load_resources()
@@ -166,12 +172,29 @@ def main():
                 st.subheader("Input Data")
                 st.dataframe(user_input_df)
                 
+                # Debug: Save raw input data to JSON
+                debug_info = {
+                    "raw_input_data": user_input_df.to_dict(orient='records')
+                }
+
                 # Process and predict
                 processed_input = preprocessor.transform(user_input_df)
+                
+                # Debug: Save processed input data to JSON
+                debug_info["processed_input_data"] = processed_input.tolist()
+
                 prediction_proba = model.predict_proba(processed_input)
                 predicted_class_idx = np.argmax(prediction_proba)
                 predicted_class_label = CLASS_LABELS[predicted_class_idx]
                 confidence = prediction_proba[0][predicted_class_idx]
+
+                # Debug: Save prediction probabilities to JSON
+                debug_info["prediction_probabilities"] = prediction_proba.tolist()
+
+                # Write debug info to file
+                with open(DEBUG_OUTPUT_PATH, 'w') as f:
+                    json.dump(debug_info, f, indent=4)
+                st.info(f"Debug information saved to {DEBUG_OUTPUT_PATH}")
 
                 # Display results in a clean format
                 col1, col2 = st.columns(2)
